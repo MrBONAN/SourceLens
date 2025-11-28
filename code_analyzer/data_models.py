@@ -5,7 +5,6 @@ from enum import Enum
 
 
 class CodeElementType(str, Enum):
-    FOLDER = "folder"
     MODULE = "module"
     CLASS = "class"
     FUNCTION = "function"
@@ -37,20 +36,11 @@ class Parameter:
 
 
 @dataclass
-class CallReference:
-    """Точка вызова функции в исходном коде."""
-    expression: str
-    line: int
-    column: int
-
-
-@dataclass
 class FunctionDefinition(BaseCodeElement):
     """Модель для описания функции."""
     element_type: CodeElementType = CodeElementType.FUNCTION
     parameters: List[Parameter] = field(default_factory=list)
     outgoing_calls: List[str] = field(default_factory=list)
-    call_sites: List[CallReference] = field(default_factory=list)
 
 
 @dataclass
@@ -59,7 +49,6 @@ class ClassDefinition(BaseCodeElement):
     element_type: CodeElementType = CodeElementType.CLASS
     base_classes: Dict[str, str] = field(default_factory=dict)
     unresolved_base_classes: List[str] = field(default_factory=list)
-    attribute_types: Dict[str, List[str]] = field(default_factory=dict)
 
 
 @dataclass

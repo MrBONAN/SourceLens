@@ -1,8 +1,8 @@
 import ast
-from typing import Set, Dict, List, Set as TypingSet
+from typing import Set, Dict, List
 from code_analyzer.data_models import (
     BaseCodeElement, FunctionDefinition, ClassDefinition, BaseCodeModule,
-    Parameter, ImportInfo, SourceSpan, CallReference
+    Parameter, ImportInfo, SourceSpan
 )
 
 
@@ -57,17 +57,6 @@ class FunctionDefHandler(NodeHandler):
             for stmt in node.body:
                 calls.extend(self._extract_calls_from_node(stmt))
             func_def.outgoing_calls = sorted(list(set(calls)))
-            call_sites = []
-            for stmt in node.body:
-                call_sites.extend(self._collect_call_sites(stmt))
-            func_def.call_sites = call_sites
-
-        parent_model = context.get(parent_id)
-        if isinstance(parent_model, ClassDefinition):
-            attribute_types = self._collect_self_attribute_types(node)
-            for attr_name, types in attribute_types.items():
-                existing = set(parent_model.attribute_types.get(attr_name, []))
-                parent_model.attribute_types[attr_name] = sorted(existing.union(types))
 
         return func_def
 
@@ -108,69 +97,6 @@ class FunctionDefHandler(NodeHandler):
             return f"{self._get_object_name(node.func)}()"
         else:
             return "unknown"
-
-    def _collect_call_sites(self, node: ast.AST) -> List[CallReference]:
-        call_sites: List[CallReference] = []
-        if isinstance(node, ast.Call):
-            expression = self._describe_expression(node.func)
-            line = getattr(node.func, 'lineno', node.lineno)
-            column = getattr(node.func, 'col_offset', node.col_offset)
-            call_sites.append(CallReference(expression=expression, line=line, column=column))
-        for child in ast.iter_child_nodes(node):
-            call_sites.extend(self._collect_call_sites(child))
-        return call_sites
-
-    def _describe_expression(self, node: ast.AST) -> str:
-        if isinstance(node, ast.Attribute):
-            return f"{self._describe_expression(node.value)}.{node.attr}"
-        if isinstance(node, ast.Name):
-            return node.id
-        if isinstance(node, ast.Call):
-            return self._describe_expression(node.func)
-        return self._get_full_name(node)
-
-    def _collect_self_attribute_types(self, node: ast.FunctionDef) -> Dict[str, TypingSet[str]]:
-        attribute_types: Dict[str, TypingSet[str]] = {}
-
-        for child in ast.walk(node):
-            if isinstance(child, ast.Assign):
-                targets = child.targets
-                value = child.value
-            elif isinstance(child, ast.AnnAssign):
-                targets = [child.target]
-                value = child.value
-            else:
-                continue
-
-            if value is None:
-                continue
-
-            inferred_types = self._infer_types_from_value(value)
-            if not inferred_types:
-                continue
-
-            for target in targets:
-                attr_name = self._extract_self_attribute_name(target)
-                if not attr_name:
-                    continue
-                attribute_types.setdefault(attr_name, set()).update(inferred_types)
-
-        return attribute_types
-
-    def _extract_self_attribute_name(self, target: ast.AST) -> str | None:
-        if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == 'self':
-            return target.attr
-        return None
-
-    def _infer_types_from_value(self, value: ast.AST) -> TypingSet[str]:
-        inferred: TypingSet[str] = set()
-        if isinstance(value, ast.Call):
-            func = value.func
-            if isinstance(func, ast.Name):
-                inferred.add(func.id)
-            elif isinstance(func, ast.Attribute):
-                inferred.add(self._get_full_name(func))
-        return inferred
 
 
 class ClassDefHandler(NodeHandler):

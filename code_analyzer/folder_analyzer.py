@@ -1,18 +1,7 @@
-import json
 from pathlib import Path
 from typing import Dict, List, Optional
-from enum import Enum
-import jedi
 from .ast_parser.processor import AstProcessor
-from .data_models import (
-    BaseCodeElement,
-    BaseCodeModule,
-    ClassDefinition,
-    FunctionDefinition,
-    ImportInfo,
-    CodeElementType
-)
-from .output_config import OutputConfig, OutputManager
+from .data_models import BaseCodeElement, BaseCodeModule, ClassDefinition, FunctionDefinition, ImportInfo
 
 
 class FolderAnalyzer:
@@ -20,7 +9,6 @@ class FolderAnalyzer:
         self.config = config
         self.all_models: Dict[str, BaseCodeElement] = {}
         self.module_mapping: Dict[str, str] = {}
-        self._jedi_scripts: Dict[str, jedi.Script] = {}
 
     def analyze_folder(self, folder_path: str,
                        include_patterns: Optional[List[str]] = None,
@@ -36,8 +24,7 @@ class FolderAnalyzer:
 
         root_module = BaseCodeModule(
             name=folder_path.name,
-            source_span=None,
-            element_type=CodeElementType.FOLDER
+            source_span=None
         )
         self.all_models[root_module.id] = root_module
 
@@ -120,27 +107,6 @@ class FolderAnalyzer:
             if module_name in file_path or file_path.endswith(f"{module_name}.py"):
                 return file_path
         return None
-
-    def export_to_json(self, output_file: Optional[str] = None) -> str:
-        class CustomJSONEncoder(json.JSONEncoder):
-            def default(self, o):
-                if isinstance(o, Enum):
-                    return o.value
-                if hasattr(o, '__dict__'):
-                    return o.__dict__
-                return str(o)
-
-        json_str = json.dumps(self.all_models, indent=4, cls=CustomJSONEncoder, ensure_ascii=False)
-
-        if output_file:
-            with open(output_file, 'w', encoding='utf-8') as f:
-                f.write(json_str)
-
-        return json_str
-
-    def export_with_config(self, output_config: OutputConfig) -> List[str]:
-        output_manager = OutputManager(output_config)
-        return output_manager.save_analysis_results(self.all_models)
 
     def _resolve_cross_file_references(self):
         global_class_map = self._build_global_class_map()
@@ -228,23 +194,14 @@ class FolderAnalyzer:
 
     def _resolve_function_calls(self, global_class_map: Dict[str, str]):
         global_function_map = self._build_global_function_map()
+
         for model_id, model in self.all_models.items():
             if isinstance(model, FunctionDefinition):
                 resolved_calls = []
-                if model.call_sites:
-                    jedi_resolved = self._resolve_calls_with_jedi(model, global_class_map)
-                    resolved_calls.extend(jedi_resolved)
-                else:
-                    for call_name in model.outgoing_calls:
-                        resolved_id = self._find_function_id(
-                            call_name,
-                            global_function_map,
-                            global_class_map,
-                            model
-                        )
-                        if resolved_id:
-                            resolved_calls.append(resolved_id)
-
+                for call_name in model.outgoing_calls:
+                    resolved_id = self._find_function_id(call_name, global_function_map, model)
+                    if resolved_id:
+                        resolved_calls.append(resolved_id)
                 model.outgoing_calls = sorted(list(set(resolved_calls)))
 
     def _build_global_function_map(self) -> Dict[str, str]:
@@ -267,7 +224,7 @@ class FolderAnalyzer:
         return function_map
 
     def _find_function_id(self, call_name: str, global_function_map: Dict[str, str],
-                          global_class_map: Dict[str, str], current_function: FunctionDefinition) -> Optional[str]:
+                          current_function: FunctionDefinition) -> Optional[str]:
         if call_name in global_function_map:
             return global_function_map[call_name]
 
@@ -284,10 +241,6 @@ class FolderAnalyzer:
                         method_id = self._find_method_in_class(base_class, method_name)
                         if method_id:
                             return method_id
-
-        field_call_resolution = self._resolve_field_call(call_name, current_function, global_class_map)
-        if field_call_resolution:
-            return field_call_resolution
 
         module = self._find_module_for_element(current_function)
         if module:
@@ -307,171 +260,6 @@ class FolderAnalyzer:
                         method_id = self._find_method_in_class(model, method_name)
                         if method_id:
                             return method_id
-
-        return None
-
-    def _resolve_calls_with_jedi(self, function: FunctionDefinition, global_class_map: Dict[str, str]) -> List[str]:
-        if not function.call_sites or not function.source_span:
-            return []
-
-        file_path = function.source_span.file_path
-        if not file_path:
-            return []
-        script = self._get_jedi_script(file_path)
-        if not script:
-            return []
-
-        current_class = self._find_class_for_function(function)
-
-        resolved_ids: List[str] = []
-        for call_ref in function.call_sites:
-            target_id = None
-
-            if '.' in call_ref.expression and current_class:
-                parts = call_ref.expression.rsplit('.', 1)
-                if len(parts) == 2:
-                    obj_expr, method_name = parts
-                    attr_name = None
-                    if obj_expr.startswith('self.'):
-                        attr_name = obj_expr[5:]  # убираем "self."
-                    elif obj_expr == 'self':
-                        method_id = self._find_method_in_class_by_name(current_class, method_name)
-                        if method_id:
-                            target_id = method_id
-
-                    if not target_id and attr_name and current_class.attribute_types:
-                        attr_types = current_class.attribute_types.get(attr_name, [])
-                        for type_name in attr_types:
-                            type_class_id = global_class_map.get(type_name)
-                            if type_class_id:
-                                type_class = self.all_models.get(type_class_id)
-                                if isinstance(type_class, ClassDefinition):
-                                    method_id = self._find_method_in_class_by_name(
-                                        type_class,
-                                        method_name
-                                    )
-                                    if method_id:
-                                        target_id = method_id
-                                        break
-
-            if not target_id:
-                try:
-                    definitions = script.goto(line=call_ref.line, column=call_ref.column)
-                    for definition in definitions:
-                        if definition.module_path is None:
-                            continue
-                        if definition.type not in {"function", "method"}:
-                            continue
-                        target_id = self._find_element_by_location(
-                            definition.module_path,
-                            definition.line
-                        )
-                        if target_id:
-                            break
-                except Exception:
-                    pass
-
-            if target_id:
-                resolved_ids.append(target_id)
-
-        return resolved_ids
-
-    def _find_method_in_class_by_name(self, class_def: ClassDefinition, method_name: str) -> Optional[str]:
-        """Находит метод в классе по имени."""
-        for child_id in class_def.children_ids:
-            child = self.all_models.get(child_id)
-            if isinstance(child, FunctionDefinition) and child.name == method_name:
-                return child_id
-        return None
-
-    def _find_element_by_location(self, file_path: str, line: int) -> Optional[str]:
-        for model_id, model in self.all_models.items():
-            if not isinstance(model, FunctionDefinition):
-                continue
-            span = model.source_span
-            if not span or not span.file_path:
-                continue
-            if Path(span.file_path) == Path(file_path) and span.start_line <= line <= span.end_line:
-                return model_id
-        return None
-
-    def _get_jedi_script(self, file_path: str) -> Optional[jedi.Script]:
-        if file_path in self._jedi_scripts:
-            return self._jedi_scripts[file_path]
-
-        path_obj = Path(file_path)
-        if not path_obj.exists():
-            return None
-
-        source = None
-        try:
-            source = path_obj.read_text(encoding='utf-8')
-        except UnicodeDecodeError:
-            try:
-                source = path_obj.read_text(encoding='cp1251')
-            except UnicodeDecodeError:
-                return None
-
-        try:
-            script = jedi.Script(code=source, path=str(path_obj))
-        except Exception:
-            return None
-
-        self._jedi_scripts[file_path] = script
-        return script
-
-    def _resolve_field_call(self, call_name: str, current_function: FunctionDefinition,
-                            global_class_map: Dict[str, str]) -> Optional[str]:
-        if '.' not in call_name:
-            return None
-
-        object_path, method_name = call_name.rsplit('.', 1)
-        if not object_path.startswith("self."):
-            return None
-
-        current_class = self._find_class_for_function(current_function)
-        if not current_class:
-            return None
-
-        attribute_chain = object_path.split('.')[1:]
-        if not attribute_chain:
-            return None
-
-        return self._resolve_attribute_chain(
-            current_class,
-            attribute_chain,
-            method_name,
-            global_class_map
-        )
-
-    def _resolve_attribute_chain(self, class_def: ClassDefinition, attribute_chain: List[str],
-                                 method_name: str, global_class_map: Dict[str, str]) -> Optional[str]:
-        attr_name = attribute_chain[0]
-        type_names = class_def.attribute_types.get(attr_name, [])
-        if not type_names:
-            return None
-
-        for type_name in type_names:
-            class_id = global_class_map.get(type_name)
-            if not class_id:
-                continue
-            target_class = self.all_models.get(class_id)
-            if not isinstance(target_class, ClassDefinition):
-                continue
-
-            if len(attribute_chain) == 1:
-                method_id = self._find_method_in_class(target_class, method_name)
-                if method_id:
-                    return method_id
-            else:
-                nested_result = self._resolve_attribute_chain(
-                    target_class,
-                    attribute_chain[1:],
-                    method_name,
-                    global_class_map
-                )
-                if nested_result:
-                    return nested_result
 
         return None
 

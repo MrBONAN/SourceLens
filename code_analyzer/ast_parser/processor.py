@@ -84,6 +84,6 @@ class AstProcessor(ast.NodeVisitor):
                         if base_id:
                             model.base_classes[base_name] = base_id
                             resolved_bases.append(base_name)
-
+                    
                     for base_name in resolved_bases:
                         model.unresolved_base_classes.remove(base_name)
