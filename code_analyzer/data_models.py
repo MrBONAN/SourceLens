@@ -9,6 +9,7 @@ class CodeElementType(str, Enum):
     CLASS = "class"
     FUNCTION = "function"
     IMPORT = "import"
+    FOLDER = "folder"
 
 
 @dataclass
@@ -55,6 +56,7 @@ class ClassDefinition(BaseCodeElement):
 class ImportInfo:
     """Модель для информации об импорте."""
     module: Optional[str]
+    element_type: CodeElementType = CodeElementType.IMPORT
     name: Optional[str] = None
     alias: Optional[str] = None
     level: int = 0
@@ -65,3 +67,9 @@ class BaseCodeModule(BaseCodeElement):
     """Модель, представляющая анализируемый файл."""
     element_type: CodeElementType = CodeElementType.MODULE
     imports: List[ImportInfo] = field(default_factory=list)
+
+
+@dataclass
+class Folder(BaseCodeElement):
+    """Модель для папки"""
+    element_type: CodeElementType = CodeElementType.FOLDER

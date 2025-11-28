@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import Dict, List, Optional
-from .ast_parser.processor import AstProcessor
+from code_analyzer.folder_reader import FolderReader
 from .data_models import BaseCodeElement, BaseCodeModule, ClassDefinition, FunctionDefinition, ImportInfo
 
 
@@ -10,103 +10,16 @@ class FolderAnalyzer:
         self.all_models: Dict[str, BaseCodeElement] = {}
         self.module_mapping: Dict[str, str] = {}
 
-    def analyze_folder(self, folder_path: str,
-                       include_patterns: Optional[List[str]] = None,
-                       exclude_patterns: Optional[List[str]] = None) -> Dict[str, BaseCodeElement]:
-        if include_patterns is None:
-            include_patterns = ['*.py']
-        if exclude_patterns is None:
-            exclude_patterns = ['__pycache__', '*.pyc', '*.pyo', '*.pyd']
+    def analyze_folder(self, folder_path: Path) -> Dict[str, BaseCodeElement]:
+        reader = FolderReader(self.config)
+        reader.read_folder(folder_path)
 
-        folder_path = Path(folder_path)
-        if not folder_path.exists():
-            raise FileNotFoundError(f"Папка {folder_path} не найдена")
-
-        root_module = BaseCodeModule(
-            name=folder_path.name,
-            source_span=None
-        )
-        self.all_models[root_module.id] = root_module
-
-        python_files = self._find_python_files(folder_path, include_patterns, exclude_patterns)
-
-        for file_path in python_files:
-            try:
-                self._analyze_file(file_path, root_module.id)
-            except Exception:
-                continue
+        self.all_models = reader.all_models
+        self.module_mapping = reader.module_mapping
 
         self._resolve_cross_file_references()
 
         return self.all_models
-
-    def _find_python_files(self, folder_path: Path,
-                           include_patterns: List[str],
-                           exclude_patterns: List[str]) -> List[Path]:
-        python_files = []
-
-        for pattern in include_patterns:
-            for file_path in folder_path.rglob(pattern):
-                if not self._should_exclude_file(file_path, exclude_patterns):
-                    python_files.append(file_path)
-
-        return sorted(python_files)
-
-    def _should_exclude_file(self, file_path: Path, exclude_patterns: List[str]) -> bool:
-        file_str = str(file_path)
-        for pattern in exclude_patterns:
-            if pattern in file_str or file_path.match(pattern):
-                return True
-        return False
-
-    def _analyze_file(self, file_path: Path, parent_module_id: str):
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                source_code = f.read()
-        except UnicodeDecodeError:
-            try:
-                with open(file_path, 'r', encoding='cp1251') as f:
-                    source_code = f.read()
-            except UnicodeDecodeError:
-                return
-
-        processor = AstProcessor(str(file_path), self.config.get('process_nodes', {}))
-        file_models = processor.process_file(source_code)
-
-        for model_id, model in file_models.items():
-            if isinstance(model, BaseCodeModule):
-                model.parent_id = parent_module_id
-                self.all_models[parent_module_id].children_ids.append(model_id)
-
-            self.all_models[model_id] = model
-
-        module_id = next(iter(file_models.keys()))
-        self.module_mapping[str(file_path)] = module_id
-
-    def get_file_dependencies(self) -> Dict[str, List[str]]:
-        dependencies = {}
-
-        for file_path, module_id in self.module_mapping.items():
-            module = self.all_models.get(module_id)
-            if not isinstance(module, BaseCodeModule):
-                continue
-
-            imported_files = []
-            for import_info in module.imports:
-                if import_info.module:
-                    imported_file = self._find_imported_file(import_info.module)
-                    if imported_file:
-                        imported_files.append(imported_file)
-
-            dependencies[file_path] = imported_files
-
-        return dependencies
-
-    def _find_imported_file(self, module_name: str) -> Optional[str]:
-        for file_path in self.module_mapping.keys():
-            if module_name in file_path or file_path.endswith(f"{module_name}.py"):
-                return file_path
-        return None
 
     def _resolve_cross_file_references(self):
         global_class_map = self._build_global_class_map()
