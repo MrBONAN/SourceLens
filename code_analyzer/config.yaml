@@ -1,0 +1,11 @@
+process_nodes:
+  ClassDef:
+    - base_classes
+    - methods
+  FunctionDef:
+    - parameters
+    - outgoing_calls
+  Import:
+    - all
+  ImportFrom:
+    - all
