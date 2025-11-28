@@ -1,5 +1,7 @@
 import ast
 from typing import Set, Dict, List
+
+# from code_analyzer.ast_parser.decorators_handler import DecoratorsHandler
 from code_analyzer.data_models import (
     BaseCodeElement, FunctionDefinition, ClassDefinition, BaseCodeModule,
     Parameter, ImportInfo, SourceSpan
@@ -49,6 +51,9 @@ class FunctionDefHandler(NodeHandler):
                 end_line=node.end_lineno
             )
         )
+        if 'decorator_list' in self.attributes_to_process:
+            func_def.decorator_list = DecoratorsHandler.handle(node)
+
         if 'parameters' in self.attributes_to_process:
             func_def.parameters = [Parameter(name=arg.arg) for arg in node.args.args]
 
@@ -62,6 +67,8 @@ class FunctionDefHandler(NodeHandler):
 
     def _extract_calls_from_node(self, node: ast.AST) -> List[str]:
         calls = []
+        # TODO может быть такая ситуация, что вызов внутри другого вызова. Было бы славно это "умно" обрабатывать
+        # например,
         if isinstance(node, ast.Call):
             call_info = self._analyze_call_context(node)
             calls.extend(call_info)
@@ -110,6 +117,10 @@ class ClassDefHandler(NodeHandler):
                 end_line=node.end_lineno
             )
         )
+
+        if 'decorator_list' in self.attributes_to_process:
+            class_def.decorator_list = DecoratorsHandler.handle(node)
+
         if 'base_classes' in self.attributes_to_process:
             class_def.unresolved_base_classes = [self._get_full_name(base) for base in node.bases]
 
@@ -131,3 +142,15 @@ class ImportHandler(NodeHandler):
                         ImportInfo(module=node.module, name=alias.name, alias=alias.asname, level=node.level)
                     )
         return None
+
+
+class DecoratorsHandler:
+    @staticmethod
+    def handle(node: ast.AST) -> List[str]:
+        if getattr(node, 'decorator_list', None) is None:
+            return []
+        decorator_list = []
+        for decorator in node.decorator_list:
+            if isinstance(decorator, ast.Name):
+                decorator_list.append(decorator.id)
+        return decorator_list

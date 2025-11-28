@@ -1,7 +1,7 @@
 import ast
 from typing import Dict, Type, List
 from code_analyzer.data_models import BaseCodeElement, BaseCodeModule, SourceSpan, ClassDefinition, FunctionDefinition
-from .handlers import NodeHandler, FunctionDefHandler, ClassDefHandler, ImportHandler
+from .handlers import FunctionDefHandler, ClassDefHandler, ImportHandler
 
 
 class AstProcessor(ast.NodeVisitor):
@@ -9,21 +9,12 @@ class AstProcessor(ast.NodeVisitor):
         self.file_path = file_path
         self.result_models: Dict[str, BaseCodeElement] = {}
         self.context_stack: List[str] = []
-        self.handler_factory = self._create_handler_factory(config)
+        self._init_handlers(config)
 
-    def _create_handler_factory(self, config: Dict[str, List[str]]) -> Dict[Type[ast.AST], NodeHandler]:
-        factory = {}
-        node_map = {
-            "ClassDef": (ast.ClassDef, ClassDefHandler),
-            "FunctionDef": (ast.FunctionDef, FunctionDefHandler),
-            "Import": (ast.Import, ImportHandler),
-            "ImportFrom": (ast.ImportFrom, ImportHandler),
-        }
-        for node_name, attributes in config.items():
-            if node_name in node_map:
-                ast_class, handler_class = node_map[node_name]
-                factory[ast_class] = handler_class(self.file_path, set(attributes))
-        return factory
+    def _init_handlers(self, config: Dict[str, List[str]]):
+        self.class_handler = ClassDefHandler(self.file_path, set(config["ClassDef"]))
+        self.func_handler = FunctionDefHandler(self.file_path, set(config["FunctionDef"]))
+        self.import_handler = ImportHandler(self.file_path, set(config["Import"] + config["ImportFrom"]))
 
     def process_file(self, source_code: str) -> Dict[str, BaseCodeElement]:
         tree = ast.parse(source_code)
@@ -39,32 +30,40 @@ class AstProcessor(ast.NodeVisitor):
         self.visit(tree)
 
         self.context_stack.pop()
-        self._post_process()
+        # self._post_process() # TODO сделать потом?
         return self.result_models
 
-    def generic_visit(self, node: ast.AST):
-        node_type = type(node)
-        handler = self.handler_factory.get(node_type)
+    def visit_ClassDef(self, node: ast.ClassDef):
+        parend_id = self.context_stack[-1]
+        model = self.class_handler.process(node, parend_id, self.result_models)
 
-        is_new_context = False
+        self._add_model(parend_id, model)
+        self.context_stack.append(model.id)
+        self.generic_visit(node)
+        self.context_stack.pop()
 
-        if handler:
-            parent_id = self.context_stack[-1]
-            new_model = handler.process(node, parent_id, self.result_models)
+    def visit_FunctionDef(self, node: ast.FunctionDef):
+        parend_id = self.context_stack[-1]
+        model = self.func_handler.process(node, parend_id, self.result_models)
 
-            if new_model:
-                self.result_models[new_model.id] = new_model
-                parent_model = self.result_models[parent_id]
-                parent_model.children_ids.append(new_model.id)
+        self._add_model(parend_id, model)
+        self.context_stack.append(model.id)
+        self.generic_visit(node)
+        self.context_stack.pop()
 
-                if isinstance(new_model, (ClassDefinition, FunctionDefinition)):
-                    self.context_stack.append(new_model.id)
-                    is_new_context = True
+    def visit_Import(self, node: ast.Import):
+        parend_id = self.context_stack[-1]
+        self.import_handler.process(node, parend_id, self.result_models)
+        self.generic_visit(node)
 
-        super().generic_visit(node)
+    def visit_ImportFrom(self, node: ast.ImportFrom):
+        parend_id = self.context_stack[-1]
+        self.import_handler.process(node, parend_id, self.result_models)
+        self.generic_visit(node)
 
-        if is_new_context:
-            self.context_stack.pop()
+    def _add_model(self, parent_id: str, model: BaseCodeElement):
+        self.result_models[model.id] = model
+        self.result_models[parent_id].children_ids.append(model.id)
 
     def _post_process(self):
         class_name_to_id_map: Dict[str, str] = {
@@ -75,15 +74,13 @@ class AstProcessor(ast.NodeVisitor):
 
         for model_id, model in self.result_models.items():
             if isinstance(model, ClassDefinition):
-                handler_config = self.handler_factory.get(ast.ClassDef)
-
-                if handler_config and 'base_classes' in handler_config.attributes_to_process:
+                if 'base_classes' in self.class_handler.attributes_to_process:
                     resolved_bases = []
                     for base_name in model.unresolved_base_classes:
                         base_id = class_name_to_id_map.get(base_name)
                         if base_id:
                             model.base_classes[base_name] = base_id
                             resolved_bases.append(base_name)
-                    
+
                     for base_name in resolved_bases:
                         model.unresolved_base_classes.remove(base_name)

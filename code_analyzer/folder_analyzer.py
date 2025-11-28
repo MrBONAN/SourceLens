@@ -1,16 +1,16 @@
 from pathlib import Path
 from typing import Dict, List, Optional
 from code_analyzer.folder_reader import FolderReader
-from .data_models import BaseCodeElement, BaseCodeModule, ClassDefinition, FunctionDefinition, ImportInfo
+from .data_models import BaseCodeElement, BaseCodeModule, ClassDefinition, FunctionDefinition, ImportInfo, JsonElement
 
 
 class FolderAnalyzer:
     def __init__(self, config: Dict[str, List[str]]):
         self.config = config
-        self.all_models: Dict[str, BaseCodeElement] = {}
+        self.all_models: Dict[str, JsonElement] = {}
         self.module_mapping: Dict[str, str] = {}
 
-    def analyze_folder(self, folder_path: Path) -> Dict[str, BaseCodeElement]:
+    def analyze_folder(self, folder_path: Path) -> Dict[str, JsonElement]:
         reader = FolderReader(self.config)
         reader.read_folder(folder_path)
 
@@ -26,7 +26,7 @@ class FolderAnalyzer:
 
         self._resolve_base_classes(global_class_map)
 
-        self._resolve_function_calls(global_class_map)
+        # self._resolve_function_calls(global_class_map)
 
     def _build_global_class_map(self) -> Dict[str, str]:
         class_map = {}

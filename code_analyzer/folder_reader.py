@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 from .ast_parser.processor import AstProcessor
 from .data_models import (
     Folder,
-    BaseCodeElement,
+    JsonElement,
     BaseCodeModule,
     CodeElementType
 )
@@ -12,7 +12,7 @@ from .data_models import (
 class FolderReader:
     def __init__(self, config: Dict[str, List[str]]):
         self.config = config
-        self.all_models: Dict[str, BaseCodeElement] = {}
+        self.all_models: Dict[str, JsonElement] = {}
         self.module_mapping: Dict[str, str] = {}
 
         self.include_patterns = ['*.py']

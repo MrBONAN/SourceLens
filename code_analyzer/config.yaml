@@ -1,11 +1,24 @@
 process_nodes:
   ClassDef:
+    - decorator_list
     - base_classes
     - methods
   FunctionDef:
+    - decorator_list
     - parameters
     - outgoing_calls
   Import:
     - all
   ImportFrom:
     - all
+json_output:
+  Folder:
+    - all
+  File:
+    - all
+  Class:
+    - all
+  Function:
+    exclude:
+      - outgoing_func_calls
+      - outgoing_method_calls

@@ -4,7 +4,17 @@ from pathlib import Path
 from enum import Enum
 from code_analyzer.folder_analyzer import FolderAnalyzer
 from code_analyzer.folder_reader import FolderReader
+from code_analyzer.json_converter import JsonConverter
 import sys
+
+# import ast
+# a = ast.parse("""
+# obj = Caller()
+# obj.call1().call2(1)
+# simple()
+# """)
+# print(ast.dump(a, indent=4))
+# exit(0)
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
