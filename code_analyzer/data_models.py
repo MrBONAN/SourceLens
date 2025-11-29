@@ -69,6 +69,9 @@ class ImportInfo:
     module: Optional[str]
     element_type: CodeElementType = CodeElementType.IMPORT
     name: Optional[str] = None
+    is_local: bool = True
+    path: Optional[str] = None
+    module_id: Optional[str] = None
     alias: Optional[str] = None
     level: int = 0
 

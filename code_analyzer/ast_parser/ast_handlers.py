@@ -1,6 +1,7 @@
 import ast
+import sys
+import os
 
-# from code_analyzer.ast_parser.decorators_handler import DecoratorsHandler
 from code_analyzer.data_models import (
     BaseCodeElement, FunctionDefinition, ClassDefinition, BaseCodeModule,
     Parameter, ImportInfo, SourceSpan
@@ -127,19 +128,73 @@ class ClassDefHandler(NodeHandler):
 
 
 class ImportHandler(NodeHandler):
+    def __init__(self, project_root: str, file_path: str, attributes: set[str]):
+        super().__init__(file_path, attributes)
+
+        self.project_root = os.path.abspath(project_root)
+        self.std_lib = sys.stdlib_module_names
+
     def process(self, node: ast.Import | ast.ImportFrom, parent_id: str, context: dict[str, BaseCodeElement]):
         module_model = context.get(parent_id)
+
         if isinstance(module_model, BaseCodeModule):
+            current_path = module_model.source_span.file_path
+
             if isinstance(node, ast.Import):
                 for alias in node.names:
+                    local_path = self._resolve_local_path(alias.name, 0, current_path)
                     module_model.imports.append(
-                        ImportInfo(module=alias.name, alias=alias.asname)
+                        ImportInfo(module=alias.name, alias=alias.asname, is_local=bool(local_path), path=local_path)
                     )
             elif isinstance(node, ast.ImportFrom):
+                local_path = self._resolve_local_path(node.module, node.level, current_path)
                 for alias in node.names:
                     module_model.imports.append(
-                        ImportInfo(module=node.module, name=alias.name, alias=alias.asname, level=node.level)
+                        ImportInfo(module=node.module, name=alias.name, alias=alias.asname, level=node.level,
+                                   is_local=bool(local_path), path=local_path)
                     )
+        return None
+
+    def _resolve_local_path(self, module_name: str | None, level: int, current_file_path: str | None) -> str | None:
+        if not module_name and level == 0:
+            return None
+
+        search_dirs = []
+
+        if level == 0:
+            root_module = module_name.split('.')[0]
+            if root_module in self.std_lib:
+                return None
+
+            search_dirs.append(self.project_root)
+
+            project_folder_name = os.path.basename(self.project_root)
+            if root_module == project_folder_name:
+                search_dirs.append(os.path.dirname(self.project_root))
+        else:
+            if not current_file_path:
+                return None
+            current_dir = os.path.dirname(current_file_path)
+            for _ in range(level - 1):
+                current_dir = os.path.dirname(current_dir)
+            search_dirs.append(current_dir)
+
+        parts = module_name.split('.') if module_name else []
+        relative_path = os.path.join(*parts)
+
+        for base_dir in search_dirs:
+            candidate_base = str(os.path.join(base_dir, relative_path))
+
+            if os.path.isdir(candidate_base) and os.path.exists(os.path.join(candidate_base, "__init__.py")):
+                return candidate_base
+
+            candidate_file = candidate_base + ".py"
+            if os.path.isfile(candidate_file):
+                return candidate_file
+
+            if os.path.isdir(candidate_base):
+                return candidate_base
+
         return None
 
 

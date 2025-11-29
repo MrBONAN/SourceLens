@@ -4,17 +4,17 @@ from .ast_handlers import FunctionDefHandler, ClassDefHandler, ImportHandler
 
 
 class AstProcessor(ast.NodeVisitor):
-    def __init__(self, file_path: str, config: dict[str, list[str]]):
+    def __init__(self, project_root: str, file_path: str, config: dict[str, list[str]]):
         self.file_path = file_path
         self.file_model_id: str = ""
         self.result_models: dict[str, BaseCodeElement] = {}
         self.context_stack: list[str] = []
-        self._init_handlers(config)
+        self._init_handlers(project_root, config)
 
-    def _init_handlers(self, config: dict[str, list[str]]):
+    def _init_handlers(self, project_root: str, config: dict[str, list[str]]):
         self.class_handler = ClassDefHandler(self.file_path, set(config["ClassDef"]))
         self.func_handler = FunctionDefHandler(self.file_path, set(config["FunctionDef"]))
-        self.import_handler = ImportHandler(self.file_path, set(config["Import"] + config["ImportFrom"]))
+        self.import_handler = ImportHandler(project_root, self.file_path, set(config["Import"] + config["ImportFrom"]))
 
     def process_file(self, source_code: str) -> dict[str, BaseCodeElement]:
         tree = ast.parse(source_code)

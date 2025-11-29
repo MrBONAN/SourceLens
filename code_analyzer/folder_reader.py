@@ -12,6 +12,7 @@ from .data_models import (
 class FolderReader:
     def __init__(self, config: dict[str, list[str]]):
         self.config = config
+        self.project_root: Optional[Path] = None
         self.all_models: dict[str, JsonElement] = {}
         self.module_mapping: dict[str, str] = {}
 
@@ -19,7 +20,11 @@ class FolderReader:
         self.exclude_patterns = ['__pycache__', '*.pyc', '*.pyo', '*.pyd']
 
     def read_folder(self, folder_path: Path, parent_id: str = None) -> Optional[str]:
-        folder_path = Path(folder_path)
+        self.project_root = folder_path
+        self._read_folder(folder_path, parent_id)
+        self._resolve_imports()
+
+    def _read_folder(self, folder_path: Path, parent_id: str = None) -> Optional[str]:
         if not folder_path.exists():
             raise FileNotFoundError(f"Папка {folder_path} не найдена")
 
@@ -39,7 +44,7 @@ class FolderReader:
 
         for folder in folder_path.iterdir():
             if folder.is_dir():
-                children_id = self.read_folder(folder, folder_model.id)
+                children_id = self._read_folder(folder, folder_model.id)
                 if children_id:
                     children_ids.append(children_id)
 
@@ -77,7 +82,7 @@ class FolderReader:
             except UnicodeDecodeError:
                 return None
 
-        processor = AstProcessor(str(file_path), self.config.get('process_nodes', {}))
+        processor = AstProcessor(str(self.project_root), str(file_path), self.config.get('process_nodes', {}))
         file_models = processor.process_file(source_code)
 
         for model_id, model in file_models.items():
@@ -90,3 +95,20 @@ class FolderReader:
         self.module_mapping[str(file_path)] = module_id
 
         return module_id
+
+    def _resolve_imports(self):
+        module_to_id: dict[str, str] = {}
+        for module_id, model in self.all_models.items():
+            if isinstance(model, Folder):
+                module_to_id[model.name] = model.id
+            elif isinstance(model, BaseCodeModule):
+                module_to_id[model.source_span.file_path] = model.id
+
+        for path, model_id in module_to_id.items():
+            model = self.all_models[model_id]
+            if isinstance(model, BaseCodeModule):
+                for imp in model.imports:
+                    if imp.is_local:
+                        module_id = module_to_id.get(imp.path)
+                        if module_id:
+                            imp.module_id = module_id
