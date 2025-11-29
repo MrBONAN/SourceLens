@@ -1,4 +1,6 @@
+import json
 from dataclasses import fields
+from enum import Enum
 from typing import Optional
 
 from code_analyzer.data_models import JsonElement, Folder, BaseCodeModule, ClassDefinition, FunctionDefinition
@@ -6,7 +8,7 @@ from code_analyzer.data_models import JsonElement, Folder, BaseCodeModule, Class
 
 class JsonConverter:
     @classmethod
-    def dump(cls, all_models: dict[str, JsonElement], config) -> dict[str, dict[str, object]]:
+    def dump(cls, all_models: dict[str, JsonElement], config) -> str:
         output: dict[str, dict[str, object]] = {}
         for id, element in all_models.items():
             type = cls._get_type(element)
@@ -31,7 +33,16 @@ class JsonConverter:
                     if value is not None:
                         obj[field] = value
                 output[id] = obj
-        return output
+
+        class CustomJSONEncoder(json.JSONEncoder):
+            def default(self, o):
+                if isinstance(o, Enum):
+                    return o.value
+                if hasattr(o, '__dict__'):
+                    return o.__dict__
+                return str(o)
+
+        return json.dumps(output, indent=2, cls=CustomJSONEncoder)
 
     @staticmethod
     def _get_type(element: JsonElement) -> Optional[str]:

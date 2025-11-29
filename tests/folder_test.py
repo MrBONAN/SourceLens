@@ -35,15 +35,7 @@ if __name__ == "__main__":
 
     analyzer = FolderAnalyzer(config)
     result = analyzer.analyze_folder(folder_path)
-    
-    class CustomJSONEncoder(json.JSONEncoder):
-        def default(self, o):
-            if isinstance(o, Enum):
-                return o.value
-            if hasattr(o, '__dict__'):
-                return o.__dict__
-            return str(o)
-
+    json_converter = JsonConverter()
 
     with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(json.dumps(result, indent=2, cls=CustomJSONEncoder))
+        f.write(json_converter.dump(result, config["json_output"]))

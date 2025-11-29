@@ -1,22 +1,21 @@
 import ast
-from typing import Dict, Type, List
 from code_analyzer.data_models import BaseCodeElement, BaseCodeModule, SourceSpan, ClassDefinition, FunctionDefinition
-from .handlers import FunctionDefHandler, ClassDefHandler, ImportHandler
+from .ast_handlers import FunctionDefHandler, ClassDefHandler, ImportHandler
 
 
 class AstProcessor(ast.NodeVisitor):
-    def __init__(self, file_path: str, config: Dict[str, List[str]]):
+    def __init__(self, file_path: str, config: dict[str, list[str]]):
         self.file_path = file_path
-        self.result_models: Dict[str, BaseCodeElement] = {}
-        self.context_stack: List[str] = []
+        self.result_models: dict[str, BaseCodeElement] = {}
+        self.context_stack: list[str] = []
         self._init_handlers(config)
 
-    def _init_handlers(self, config: Dict[str, List[str]]):
+    def _init_handlers(self, config: dict[str, list[str]]):
         self.class_handler = ClassDefHandler(self.file_path, set(config["ClassDef"]))
         self.func_handler = FunctionDefHandler(self.file_path, set(config["FunctionDef"]))
         self.import_handler = ImportHandler(self.file_path, set(config["Import"] + config["ImportFrom"]))
 
-    def process_file(self, source_code: str) -> Dict[str, BaseCodeElement]:
+    def process_file(self, source_code: str) -> dict[str, BaseCodeElement]:
         tree = ast.parse(source_code)
 
         module_name = self.file_path.split('/')[-1].split('.')[0]
@@ -66,7 +65,7 @@ class AstProcessor(ast.NodeVisitor):
         self.result_models[parent_id].children_ids.append(model.id)
 
     def _post_process(self):
-        class_name_to_id_map: Dict[str, str] = {
+        class_name_to_id_map: dict[str, str] = {
             model.name: model.id
             for model in self.result_models.values()
             if isinstance(model, ClassDefinition)

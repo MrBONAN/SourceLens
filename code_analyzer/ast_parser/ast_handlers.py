@@ -1,5 +1,4 @@
 import ast
-from typing import Set, Dict, List
 
 # from code_analyzer.ast_parser.decorators_handler import DecoratorsHandler
 from code_analyzer.data_models import (
@@ -9,7 +8,7 @@ from code_analyzer.data_models import (
 
 
 class NodeHandler:
-    def __init__(self, file_path: str, attributes: Set[str]):
+    def __init__(self, file_path: str, attributes: set[str]):
         self.file_path = file_path
         self.attributes_to_process = attributes
 
@@ -24,7 +23,7 @@ class NodeHandler:
             )
         )
 
-    def process(self, node: ast.AST, parent_id: str, context: Dict[str, BaseCodeElement]) -> BaseCodeElement:
+    def process(self, node: ast.AST, parent_id: str, context: dict[str, BaseCodeElement]) -> BaseCodeElement:
         raise NotImplementedError
 
     @staticmethod
@@ -41,7 +40,7 @@ class NodeHandler:
 
 
 class FunctionDefHandler(NodeHandler):
-    def process(self, node: ast.FunctionDef, parent_id: str, context: Dict[str, BaseCodeElement]) -> FunctionDefinition:
+    def process(self, node: ast.FunctionDef, parent_id: str, context: dict[str, BaseCodeElement]) -> FunctionDefinition:
         func_def = FunctionDefinition(
             name=node.name,
             parent_id=parent_id,
@@ -65,7 +64,7 @@ class FunctionDefHandler(NodeHandler):
 
         return func_def
 
-    def _extract_calls_from_node(self, node: ast.AST) -> List[str]:
+    def _extract_calls_from_node(self, node: ast.AST) -> list[str]:
         calls = []
         # TODO может быть такая ситуация, что вызов внутри другого вызова. Было бы славно это "умно" обрабатывать
         # например,
@@ -76,7 +75,7 @@ class FunctionDefHandler(NodeHandler):
             calls.extend(self._extract_calls_from_node(child))
         return calls
 
-    def _analyze_call_context(self, call_node: ast.Call) -> List[str]:
+    def _analyze_call_context(self, call_node: ast.Call) -> list[str]:
         calls = []
         func = call_node.func
 
@@ -107,7 +106,7 @@ class FunctionDefHandler(NodeHandler):
 
 
 class ClassDefHandler(NodeHandler):
-    def process(self, node: ast.ClassDef, parent_id: str, context: Dict[str, BaseCodeElement]) -> ClassDefinition:
+    def process(self, node: ast.ClassDef, parent_id: str, context: dict[str, BaseCodeElement]) -> ClassDefinition:
         class_def = ClassDefinition(
             name=node.name,
             parent_id=parent_id,
@@ -128,7 +127,7 @@ class ClassDefHandler(NodeHandler):
 
 
 class ImportHandler(NodeHandler):
-    def process(self, node: ast.Import | ast.ImportFrom, parent_id: str, context: Dict[str, BaseCodeElement]):
+    def process(self, node: ast.Import | ast.ImportFrom, parent_id: str, context: dict[str, BaseCodeElement]):
         module_model = context.get(parent_id)
         if isinstance(module_model, BaseCodeModule):
             if isinstance(node, ast.Import):
@@ -146,7 +145,7 @@ class ImportHandler(NodeHandler):
 
 class DecoratorsHandler:
     @staticmethod
-    def handle(node: ast.AST) -> List[str]:
+    def handle(node: ast.AST) -> list[str]:
         if getattr(node, 'decorator_list', None) is None:
             return []
         decorator_list = []

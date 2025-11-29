@@ -1,16 +1,16 @@
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 from code_analyzer.folder_reader import FolderReader
 from .data_models import BaseCodeElement, BaseCodeModule, ClassDefinition, FunctionDefinition, ImportInfo, JsonElement
 
 
 class FolderAnalyzer:
-    def __init__(self, config: Dict[str, List[str]]):
+    def __init__(self, config: dict[str, list[str]]):
         self.config = config
-        self.all_models: Dict[str, JsonElement] = {}
-        self.module_mapping: Dict[str, str] = {}
+        self.all_models: dict[str, JsonElement] = {}
+        self.module_mapping: dict[str, str] = {}
 
-    def analyze_folder(self, folder_path: Path) -> Dict[str, JsonElement]:
+    def analyze_folder(self, folder_path: Path) -> dict[str, JsonElement]:
         reader = FolderReader(self.config)
         reader.read_folder(folder_path)
 
@@ -28,7 +28,7 @@ class FolderAnalyzer:
 
         # self._resolve_function_calls(global_class_map)
 
-    def _build_global_class_map(self) -> Dict[str, str]:
+    def _build_global_class_map(self) -> dict[str, str]:
         class_map = {}
         for model_id, model in self.all_models.items():
             if isinstance(model, ClassDefinition):
@@ -55,7 +55,7 @@ class FolderAnalyzer:
             current = parent
         return None
 
-    def _resolve_base_classes(self, global_class_map: Dict[str, str]):
+    def _resolve_base_classes(self, global_class_map: dict[str, str]):
         for model_id, model in self.all_models.items():
             if isinstance(model, ClassDefinition):
                 resolved_bases = []
@@ -68,7 +68,7 @@ class FolderAnalyzer:
                 for base_name in resolved_bases:
                     model.unresolved_base_classes.remove(base_name)
 
-    def _find_base_class_id(self, base_name: str, global_class_map: Dict[str, str],
+    def _find_base_class_id(self, base_name: str, global_class_map: dict[str, str],
                             current_class: ClassDefinition) -> Optional[str]:
         if base_name in global_class_map:
             return global_class_map[base_name]
@@ -105,7 +105,7 @@ class FolderAnalyzer:
                 return module_id
         return None
 
-    def _resolve_function_calls(self, global_class_map: Dict[str, str]):
+    def _resolve_function_calls(self, global_class_map: dict[str, str]):
         global_function_map = self._build_global_function_map()
 
         for model_id, model in self.all_models.items():
@@ -117,7 +117,7 @@ class FolderAnalyzer:
                         resolved_calls.append(resolved_id)
                 model.outgoing_calls = sorted(list(set(resolved_calls)))
 
-    def _build_global_function_map(self) -> Dict[str, str]:
+    def _build_global_function_map(self) -> dict[str, str]:
         function_map = {}
         for model_id, model in self.all_models.items():
             if isinstance(model, FunctionDefinition):
@@ -136,7 +136,7 @@ class FolderAnalyzer:
 
         return function_map
 
-    def _find_function_id(self, call_name: str, global_function_map: Dict[str, str],
+    def _find_function_id(self, call_name: str, global_function_map: dict[str, str],
                           current_function: FunctionDefinition) -> Optional[str]:
         if call_name in global_function_map:
             return global_function_map[call_name]

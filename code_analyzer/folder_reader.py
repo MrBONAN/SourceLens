@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 from .ast_parser.processor import AstProcessor
 from .data_models import (
     Folder,
@@ -10,10 +10,10 @@ from .data_models import (
 
 
 class FolderReader:
-    def __init__(self, config: Dict[str, List[str]]):
+    def __init__(self, config: dict[str, list[str]]):
         self.config = config
-        self.all_models: Dict[str, JsonElement] = {}
-        self.module_mapping: Dict[str, str] = {}
+        self.all_models: dict[str, JsonElement] = {}
+        self.module_mapping: dict[str, str] = {}
 
         self.include_patterns = ['*.py']
         self.exclude_patterns = ['__pycache__', '*.pyc', '*.pyo', '*.pyd']
@@ -34,12 +34,14 @@ class FolderReader:
         python_files = self._find_python_files(folder_path)
         for python_file in python_files:
             children_id = self._analyze_file(python_file, folder_model.id)
-            if children_id is not None:
+            if children_id:
                 children_ids.append(children_id)
 
         for folder in folder_path.iterdir():
             if folder.is_dir():
-                children_ids.append(self.read_folder(folder, folder_model.id))
+                children_id = self.read_folder(folder, folder_model.id)
+                if children_id:
+                    children_ids.append(children_id)
 
         if any(children_ids):
             self.all_models[folder_model.id] = folder_model
@@ -48,7 +50,7 @@ class FolderReader:
 
         return None
 
-    def _find_python_files(self, folder_path: Path) -> List[Path]:
+    def _find_python_files(self, folder_path: Path) -> list[Path]:
         python_files = []
 
         for pattern in self.include_patterns:
@@ -64,7 +66,7 @@ class FolderReader:
                 return True
         return False
 
-    def _analyze_file(self, file_path: Path, parent_module_id: str) -> str:
+    def _analyze_file(self, file_path: Path, parent_module_id: str) -> Optional[str]:
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 source_code = f.read()
