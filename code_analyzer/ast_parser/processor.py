@@ -1,6 +1,7 @@
 import ast
-from code_analyzer.data_models import BaseCodeElement, BaseCodeModule, SourceSpan, ClassDefinition, FunctionDefinition
+from code_analyzer.data_models import BaseCodeElement, BaseCodeModule, SourceSpan, ClassDefinition
 from .ast_handlers import FunctionDefHandler, ClassDefHandler, ImportHandler
+from .instruction_builder import InstructionBuilder
 
 
 class AstProcessor(ast.NodeVisitor):
@@ -25,6 +26,8 @@ class AstProcessor(ast.NodeVisitor):
             source_span=SourceSpan(file_path=self.file_path, start_line=1, end_line=len(source_code.splitlines()))
         )
 
+        module_element.instructions = InstructionBuilder().build(tree.body)
+
         self.file_model_id = module_element.id
         self.result_models[module_element.id] = module_element
         self.context_stack.append(module_element.id)
@@ -47,6 +50,9 @@ class AstProcessor(ast.NodeVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef):
         parend_id = self.context_stack[-1]
         model = self.func_handler.process(node, parend_id, self.result_models)
+
+        func_builder = InstructionBuilder()
+        model.instructions = func_builder.build(node.body)
 
         self._add_model(parend_id, model)
         self.context_stack.append(model.id)

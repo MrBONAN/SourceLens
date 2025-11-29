@@ -4,6 +4,22 @@ from typing import Optional
 from enum import Enum
 
 
+class OperationType(str, Enum):
+    CALL_FUNCTION = "call_function"
+    CALL_METHOD = "call_method"
+    ASSIGN = "assign"
+    GET_ATTR = "get_attr"
+
+
+@dataclass
+class Instruction:
+    target: Optional[str]
+    op: OperationType
+    name: Optional[str] = None
+    base_object: Optional[str] = None
+    arguments: list[str] = field(default_factory=list)
+
+
 class CodeElementType(str, Enum):
     UNKNOWN = "unknown"
     FILE = "file"
@@ -38,29 +54,9 @@ class BaseCodeElement(JsonElement):
 
 
 @dataclass
-class Parameter:
-    """Модель для параметра функции."""
-    name: str
-
-
-@dataclass
-class FunctionDefinition(BaseCodeElement):
-    """Модель для описания функции."""
-    element_type: CodeElementType = CodeElementType.FUNCTION
-    decorator_list: list[str] = field(default_factory=list)
-    parameters: list[Parameter] = field(default_factory=list)
-    outgoing_calls: list[str] = field(default_factory=list)
-    outgoing_func_calls: list[str] = field(default_factory=list)
-    outgoing_method_calls: list[str] = field(default_factory=list)
-
-
-@dataclass
-class ClassDefinition(BaseCodeElement):
-    """Модель для описания класса."""
-    element_type: CodeElementType = CodeElementType.CLASS
-    decorator_list: list[str] = field(default_factory=list)
-    base_classes: dict[str, str] = field(default_factory=dict)
-    unresolved_base_classes: list[str] = field(default_factory=list)
+class Folder(JsonElement):
+    """Модель для папки"""
+    element_type: CodeElementType = CodeElementType.FOLDER
 
 
 @dataclass
@@ -77,13 +73,35 @@ class ImportInfo:
 
 
 @dataclass
-class Folder(JsonElement):
-    """Модель для папки"""
-    element_type: CodeElementType = CodeElementType.FOLDER
-
-
-@dataclass
 class BaseCodeModule(BaseCodeElement):
     """Модель, представляющая анализируемый файл."""
     element_type: CodeElementType = CodeElementType.FILE
     imports: list[ImportInfo] = field(default_factory=list)
+    instructions: list[Instruction] = field(default_factory=list)
+
+
+@dataclass
+class Parameter:
+    """Модель для параметра функции."""
+    name: str
+
+
+@dataclass
+class FunctionDefinition(BaseCodeElement):
+    """Модель для описания функции."""
+    element_type: CodeElementType = CodeElementType.FUNCTION
+    decorator_list: list[str] = field(default_factory=list)
+    parameters: list[Parameter] = field(default_factory=list)
+    instructions: list[Instruction] = field(default_factory=list)
+    outgoing_calls: list[str] = field(default_factory=list)
+    outgoing_func_calls: list[str] = field(default_factory=list)
+    outgoing_method_calls: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ClassDefinition(BaseCodeElement):
+    """Модель для описания класса."""
+    element_type: CodeElementType = CodeElementType.CLASS
+    decorator_list: list[str] = field(default_factory=list)
+    base_classes: dict[str, str] = field(default_factory=dict)
+    unresolved_base_classes: list[str] = field(default_factory=list)
