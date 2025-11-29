@@ -25,6 +25,7 @@ if __name__ == "__main__":
     project_root = current_dir.parent
     config_path = project_root / "code_analyzer" / "config.yaml"
     folder_path = project_root / "code_analyzer"
+    folder_path = project_root / "tests" / test_folder
     output_path = project_root / "tests" / "temp" / output_file
 
     with open(config_path, 'r', encoding='utf-8') as f:

@@ -1,0 +1,2 @@
+class OriginalBase:
+    pass

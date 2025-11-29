@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Optional
 from code_analyzer.folder_reader import FolderReader
 from .data_models import BaseCodeElement, BaseCodeModule, ClassDefinition, FunctionDefinition, ImportInfo, JsonElement
+from .hierarchy_resolver import HierarchyResolver
 
 
 class FolderAnalyzer:
@@ -22,29 +23,10 @@ class FolderAnalyzer:
         return self.all_models
 
     def _resolve_cross_file_references(self):
-        global_class_map = self._build_global_class_map()
+        resolver = HierarchyResolver(self.all_models)
+        resolver.resolve_all()
 
-        self._resolve_base_classes(global_class_map)
-
-        # self._resolve_function_calls(global_class_map)
-
-    def _build_global_class_map(self) -> dict[str, str]:
-        class_map = {}
-        for model_id, model in self.all_models.items():
-            if isinstance(model, ClassDefinition):
-                class_map[model.name] = model_id
-
-                module = self._find_module_for_element(model)
-                if module:
-                    full_name = f"{module.name}.{model.name}"
-                    class_map[full_name] = model_id
-
-                if model.source_span and model.source_span.file_path:
-                    file_name = Path(model.source_span.file_path).stem
-                    file_class_name = f"{file_name}.{model.name}"
-                    class_map[file_class_name] = model_id
-
-        return class_map
+        # self._resolve_function_calls()
 
     def _find_module_for_element(self, element: BaseCodeElement) -> Optional[BaseCodeModule]:
         current = element
@@ -53,47 +35,6 @@ class FolderAnalyzer:
             if isinstance(parent, BaseCodeModule):
                 return parent
             current = parent
-        return None
-
-    def _resolve_base_classes(self, global_class_map: dict[str, str]):
-        for model_id, model in self.all_models.items():
-            if isinstance(model, ClassDefinition):
-                resolved_bases = []
-                for base_name in model.unresolved_base_classes:
-                    base_id = self._find_base_class_id(base_name, global_class_map, model)
-                    if base_id:
-                        model.base_classes[base_name] = base_id
-                        resolved_bases.append(base_name)
-
-                for base_name in resolved_bases:
-                    model.unresolved_base_classes.remove(base_name)
-
-    def _find_base_class_id(self, base_name: str, global_class_map: dict[str, str],
-                            current_class: ClassDefinition) -> Optional[str]:
-        if base_name in global_class_map:
-            return global_class_map[base_name]
-
-        module = self._find_module_for_element(current_class)
-        if module:
-            for import_info in module.imports:
-                if import_info.name == base_name:
-                    imported_module_id = self._find_imported_module_id(import_info)
-                    if imported_module_id:
-                        imported_module = self.all_models.get(imported_module_id)
-                        if isinstance(imported_module, BaseCodeModule):
-                            for child_id in imported_module.children_ids:
-                                child = self.all_models.get(child_id)
-                                if isinstance(child, ClassDefinition) and child.name == base_name:
-                                    return child_id
-
-        if '.' in base_name:
-            parts = base_name.split('.')
-            if len(parts) == 2:
-                module_name, class_name = parts
-                full_name = f"{module_name}.{class_name}"
-                if full_name in global_class_map:
-                    return global_class_map[full_name]
-
         return None
 
     def _find_imported_module_id(self, import_info: ImportInfo) -> Optional[str]:
@@ -105,7 +46,7 @@ class FolderAnalyzer:
                 return module_id
         return None
 
-    def _resolve_function_calls(self, global_class_map: dict[str, str]):
+    def _resolve_function_calls(self):
         global_function_map = self._build_global_function_map()
 
         for model_id, model in self.all_models.items():

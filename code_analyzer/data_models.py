@@ -25,7 +25,6 @@ class CodeElementType(str, Enum):
     FILE = "file"
     CLASS = "class"
     FUNCTION = "function"
-    IMPORT = "import"
     FOLDER = "folder"
 
 
@@ -63,7 +62,6 @@ class Folder(JsonElement):
 class ImportInfo:
     """Модель для информации об импорте."""
     module: Optional[str]
-    element_type: CodeElementType = CodeElementType.IMPORT
     name: Optional[str] = None
     is_local: bool = True
     path: Optional[str] = None
