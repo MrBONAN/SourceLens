@@ -1,9 +1,6 @@
-import json
 import yaml
 from pathlib import Path
-from enum import Enum
 from code_analyzer.folder_analyzer import FolderAnalyzer
-from code_analyzer.folder_reader import FolderReader
 from code_analyzer.json_converter import JsonConverter
 import sys
 

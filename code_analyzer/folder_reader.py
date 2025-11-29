@@ -86,7 +86,7 @@ class FolderReader:
 
             self.all_models[model_id] = model
 
-        module_id = next(iter(file_models.keys()))
+        module_id = processor.file_model_id
         self.module_mapping[str(file_path)] = module_id
 
         return module_id

@@ -5,6 +5,7 @@ from enum import Enum
 
 
 class CodeElementType(str, Enum):
+    UNKNOWN = "unknown"
     FILE = "file"
     CLASS = "class"
     FUNCTION = "function"
@@ -25,6 +26,7 @@ class JsonElement:
     """Базовая модель для всех элементов в выходном Json"""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     name: str = ""
+    element_type: CodeElementType = field(default_factory=lambda: CodeElementType.UNKNOWN)
     parent_id: Optional[str] = None
     children_ids: list[str] = field(default_factory=list)
 

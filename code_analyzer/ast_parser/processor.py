@@ -6,6 +6,7 @@ from .ast_handlers import FunctionDefHandler, ClassDefHandler, ImportHandler
 class AstProcessor(ast.NodeVisitor):
     def __init__(self, file_path: str, config: dict[str, list[str]]):
         self.file_path = file_path
+        self.file_model_id: str = ""
         self.result_models: dict[str, BaseCodeElement] = {}
         self.context_stack: list[str] = []
         self._init_handlers(config)
@@ -23,6 +24,8 @@ class AstProcessor(ast.NodeVisitor):
             name=module_name,
             source_span=SourceSpan(file_path=self.file_path, start_line=1, end_line=len(source_code.splitlines()))
         )
+
+        self.file_model_id = module_element.id
         self.result_models[module_element.id] = module_element
         self.context_stack.append(module_element.id)
 
