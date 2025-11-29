@@ -52,28 +52,57 @@ class HierarchyResolver:
         if '.' in base_name:
             parts = base_name.split('.', 1)
             module_alias = parts[0]
-            class_name_in_module = parts[1]
+            rest_of_path = parts[1]
 
             for imp in current_module.imports:
-                # import my_lib as ml  -> ml.Base
-                # import my_lib        -> my_lib.Base
                 current_import_name = imp.alias if imp.alias else imp.module
 
-                # Тут нужно аккуратно сравнить. imp.module может быть "code_analyzer.data_models"
-                # А в коде может быть использовано data_models.BaseCodeElement
-                # Или полный путь code_analyzer.data_models.BaseCodeElement
+                match = (current_import_name == module_alias)
 
-                # Упрощенная логика: если алиас совпадает
-                # TODO а какая не упрощённая?
-                if current_import_name == module_alias and imp.module_id and imp.is_local:
+                if not match and imp.name == module_alias:
+                    match = True
+
+                if match:
+                    if imp.module_id and imp.is_local:
+                        target_module = self.all_models.get(imp.module_id)
+                        if isinstance(target_module, BaseCodeModule):
+                            found_id = self._find_class_deeply(target_module, rest_of_path)
+                            if found_id:
+                                return found_id
+
+        return None
+
+    def _find_class_deeply(self, start_element: JsonElement, name_chain: str) -> Optional[str]:
+        if not name_chain:
+            return start_element.id
+
+        parts = name_chain.split('.', 1)
+        current_name = parts[0]
+        remaining_chain = parts[1] if len(parts) > 1 else None
+
+        for child_id in start_element.children_ids:
+            child = self.all_models.get(child_id)
+            if child and child.name == current_name:
+                if not remaining_chain:
+                    if isinstance(child, ClassDefinition):
+                        return child.id
+                    return None
+                return self._find_class_deeply(child, remaining_chain)
+
+        if isinstance(start_element, BaseCodeModule):
+            for imp in start_element.imports:
+                check_name = imp.alias if imp.alias else imp.name
+
+                if check_name == current_name and imp.module_id and imp.is_local:
                     target_module = self.all_models.get(imp.module_id)
-                    if isinstance(target_module, BaseCodeModule):
-                        # TODO сделать полную версию
-                        # Рекурсивно ищем (на случай вложенности module.sub.Class)
-                        # Но для простоты пока ищем класс напрямую в модуле
-                        found_id = self._find_class_in_module_children(target_module, class_name_in_module)
-                        if found_id:
-                            return found_id
+                    if target_module:
+                        if not remaining_chain:
+                            # Путь закончился на модуле? Странно для базового класса,
+                            # но теоретически возможно, если класс называется так же как модуль.
+                            # Но скорее всего мы ищем Class внутри.
+                            return None
+
+                        return self._find_class_deeply(target_module, remaining_chain)
 
         return None
 

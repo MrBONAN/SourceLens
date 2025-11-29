@@ -35,7 +35,6 @@ class AstProcessor(ast.NodeVisitor):
         self.visit(tree)
 
         self.context_stack.pop()
-        # self._post_process() # TODO сделать потом?
         return self.result_models
 
     def visit_ClassDef(self, node: ast.ClassDef):
@@ -72,23 +71,3 @@ class AstProcessor(ast.NodeVisitor):
     def _add_model(self, parent_id: str, model: BaseCodeElement):
         self.result_models[model.id] = model
         self.result_models[parent_id].children_ids.append(model.id)
-
-    def _post_process(self):
-        class_name_to_id_map: dict[str, str] = {
-            model.name: model.id
-            for model in self.result_models.values()
-            if isinstance(model, ClassDefinition)
-        }
-
-        for model_id, model in self.result_models.items():
-            if isinstance(model, ClassDefinition):
-                if 'base_classes' in self.class_handler.attributes_to_process:
-                    resolved_bases = []
-                    for base_name in model.unresolved_base_classes:
-                        base_id = class_name_to_id_map.get(base_name)
-                        if base_id:
-                            model.base_classes[base_name] = base_id
-                            resolved_bases.append(base_name)
-
-                    for base_name in resolved_bases:
-                        model.unresolved_base_classes.remove(base_name)

@@ -17,6 +17,7 @@ class TestInheritance:
         ("test_inheritance_module_dot", "Service", "Helper"),
         ("test_inheritance_local_priority", "AppConfig", "Config"),
         ("test_inheritance_nested_pkg", "MyPlugin", "CoreObject"),
+        ("test_inheritance_deep", "SubmitButton", "Button"),
     ])
     def test_inheritance_resolution(self, analyzer, test_data_dir, folder_name, child_name, expected_parent_name):
         target_folder = test_data_dir / folder_name

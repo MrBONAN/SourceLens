@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     current_dir = Path(__file__).parent
     project_root = current_dir.parent
-    config_path = project_root / "code_analyzer" / "config.yaml"
+    config_path = project_root / "code_analyzer" / "config_for_tests.yaml"
     folder_path = project_root / "code_analyzer"
     folder_path = project_root / "tests" / test_folder
     output_path = project_root / "tests" / "temp" / output_file

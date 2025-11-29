@@ -1,0 +1,28 @@
+process_nodes:
+  ClassDef:
+    - decorator_list
+    - base_classes
+    - methods
+  FunctionDef:
+    - decorator_list
+    - parameters
+    - outgoing_calls
+  Import:
+    - all
+  ImportFrom:
+    - all
+json_output:
+  Folder:
+    exclude:
+      - source_span
+  File:
+    exclude:
+      - source_span
+  Class:
+    exclude:
+      - source_span
+  Function:
+    exclude:
+      - source_span
+      - outgoing_func_calls
+      - outgoing_method_calls
