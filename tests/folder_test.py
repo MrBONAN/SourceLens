@@ -4,15 +4,6 @@ from code_analyzer.folder_analyzer import FolderAnalyzer
 from code_analyzer.json_converter import JsonConverter
 import sys
 
-# import ast
-# a = ast.parse("""
-# obj = Caller()
-# obj.call1().call2(1)
-# simple()
-# """)
-# print(ast.dump(a, indent=4))
-# exit(0)
-
 if __name__ == "__main__":
     if len(sys.argv) == 1:
         print("Для работы программы необходимо передать путь к папке")
@@ -23,8 +14,7 @@ if __name__ == "__main__":
 
     current_dir = Path(__file__).parent
     project_root = current_dir.parent
-    config_path = project_root / "code_analyzer" / "config_for_tests.yaml"
-    folder_path = project_root / "code_analyzer"
+    config_path = project_root / "code_analyzer" / "config.yaml"
     folder_path = project_root / "tests" / test_folder
     output_path = project_root / "tests" / "temp" / output_file
 

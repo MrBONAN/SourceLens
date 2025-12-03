@@ -26,7 +26,7 @@ class FolderAnalyzer:
         resolver = HierarchyResolver(self.all_models)
         resolver.resolve_all()
 
-        # self._resolve_function_calls()
+        self._resolve_function_calls()
 
     def _find_module_for_element(self, element: BaseCodeElement) -> Optional[BaseCodeModule]:
         current = element

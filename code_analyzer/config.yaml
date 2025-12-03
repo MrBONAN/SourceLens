@@ -15,10 +15,15 @@ json_output:
   Folder:
     - all
   File:
-    - all
+    exclude:
+      - imports
+      - instructions
   Class:
-    - all
+    exclude:
+      - decorator_list
   Function:
     exclude:
       - outgoing_func_calls
       - outgoing_method_calls
+      - instructions
+      - decorator_list
