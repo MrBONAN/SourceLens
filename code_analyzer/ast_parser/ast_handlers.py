@@ -14,13 +14,16 @@ class NodeHandler:
         self.attributes_to_process = attributes
 
     def create_model(self, node: ast.AST, parent_id: str) -> BaseCodeElement:
+        start_line = getattr(node, 'lineno', 1)
+        end_line = getattr(node, 'end_lineno', start_line)
+
         return BaseCodeElement(
             name=getattr(node, 'name', 'unknown'),
             parent_id=parent_id,
             source_span=SourceSpan(
                 file_path=self.file_path,
-                start_line=node.lineno,
-                end_line=getattr(node, 'end_lineno', node.lineno)
+                start_line=start_line,
+                end_line=end_line
             )
         )
 
@@ -53,57 +56,37 @@ class FunctionDefHandler(NodeHandler):
         )
         if 'decorator_list' in self.attributes_to_process:
             func_def.decorator_list = DecoratorsHandler.handle(node)
+            if 'outgoing_calls' in self.attributes_to_process:
+                func_def.outgoing_calls.extend(func_def.decorator_list)
 
         if 'parameters' in self.attributes_to_process:
             func_def.parameters = [Parameter(name=arg.arg) for arg in node.args.args]
 
         if 'outgoing_calls' in self.attributes_to_process:
-            calls = []
-            for stmt in node.body:
-                calls.extend(self._extract_calls_from_node(stmt))
-            func_def.outgoing_calls = sorted(list(set(calls)))
+            self._collect_calls(node, func_def)
 
         return func_def
 
-    def _extract_calls_from_node(self, node: ast.AST) -> list[str]:
-        calls = []
-        # TODO может быть такая ситуация, что вызов внутри другого вызова. Было бы славно это "умно" обрабатывать
-        # например,
-        if isinstance(node, ast.Call):
-            call_info = self._analyze_call_context(node)
-            calls.extend(call_info)
-        for child in ast.iter_child_nodes(node):
-            calls.extend(self._extract_calls_from_node(child))
-        return calls
+    def _collect_calls(self, node: ast.FunctionDef, func_model: FunctionDefinition):
+        for child in ast.walk(node):
+            if isinstance(child, ast.Call):
+                func = child.func
 
-    def _analyze_call_context(self, call_node: ast.Call) -> list[str]:
-        calls = []
-        func = call_node.func
+                if isinstance(func, ast.Name):
+                    call_name = func.id
+                    func_model.outgoing_calls.append(call_name)
+                    func_model.outgoing_func_calls.append(call_name)
 
-        if isinstance(func, ast.Name):
-            calls.append(func.id)
 
-        elif isinstance(func, ast.Attribute):
-            calls.append(func.attr)
-            calls.append(f"{self._get_object_name(func.value)}.{func.attr}")
+                elif isinstance(func, ast.Attribute):
+                    full_name = self._get_full_name(func)
 
-            if isinstance(func.value, ast.Name) and func.value.id == 'self':
-                calls.append(f"self.{func.attr}")
+                    func_model.outgoing_calls.append(full_name)
+                    func_model.outgoing_method_calls.append(full_name)
 
-        elif isinstance(func, ast.Call):
-            calls.append(self._get_full_name(func))
-
-        return calls
-
-    def _get_object_name(self, node: ast.AST) -> str:
-        if isinstance(node, ast.Name):
-            return node.id
-        elif isinstance(node, ast.Attribute):
-            return f"{self._get_object_name(node.value)}.{node.attr}"
-        elif isinstance(node, ast.Call):
-            return f"{self._get_object_name(node.func)}()"
-        else:
-            return "unknown"
+        func_model.outgoing_calls = sorted(list(set(func_model.outgoing_calls)))
+        func_model.outgoing_func_calls = sorted(list(set(func_model.outgoing_func_calls)))
+        func_model.outgoing_method_calls = sorted(list(set(func_model.outgoing_method_calls)))
 
 
 class ClassDefHandler(NodeHandler):
@@ -180,10 +163,14 @@ class ImportHandler(NodeHandler):
             search_dirs.append(current_dir)
 
         parts = module_name.split('.') if module_name else []
-        relative_path = os.path.join(*parts)
+
+        if not parts:
+            relative_path = ""
+        else:
+            relative_path = os.path.join(*parts) # type: ignore
 
         for base_dir in search_dirs:
-            candidate_base = str(os.path.join(base_dir, relative_path))
+            candidate_base = str(os.path.join(base_dir, relative_path)) # type: ignore
 
             if os.path.isdir(candidate_base) and os.path.exists(os.path.join(candidate_base, "__init__.py")):
                 return candidate_base
@@ -201,10 +188,12 @@ class ImportHandler(NodeHandler):
 class DecoratorsHandler:
     @staticmethod
     def handle(node: ast.AST) -> list[str]:
-        if getattr(node, 'decorator_list', None) is None:
+        decorators = getattr(node, 'decorator_list', [])
+        if not decorators:
             return []
+
         decorator_list = []
-        for decorator in node.decorator_list:
+        for decorator in decorators:
             if isinstance(decorator, ast.Name):
                 decorator_list.append(decorator.id)
         return decorator_list
