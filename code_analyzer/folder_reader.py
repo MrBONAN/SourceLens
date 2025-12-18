@@ -83,7 +83,10 @@ class FolderReader:
                 return None
 
         processor = AstProcessor(str(self.project_root), str(file_path), self.config.get('process_nodes', {}))
-        file_models = processor.process_file(source_code)
+        try:
+            file_models = processor.process_file(source_code)
+        except Exception:
+            return None
 
         for model_id, model in file_models.items():
             if isinstance(model, BaseCodeModule):
