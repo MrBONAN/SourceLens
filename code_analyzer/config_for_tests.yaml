@@ -26,3 +26,11 @@ json_output:
       - source_span
       - outgoing_func_calls
       - outgoing_method_calls
+  ErrorsList:
+    - element_type
+    - errors
+  AstParsingError:
+    exclude:
+      - id
+      - parent_id
+      - children_ids

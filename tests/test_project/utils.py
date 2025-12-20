@@ -3,3 +3,6 @@ def simple_helper():
 
 def another_helper():
     print("Another one")
+
+# ТЕСТ вывода ошибок
+error(

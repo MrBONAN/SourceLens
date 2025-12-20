@@ -26,6 +26,8 @@ class CodeElementType(str, Enum):
     CLASS = "class"
     FUNCTION = "function"
     FOLDER = "folder"
+    ERRORS_LIST = "errors_list"
+    ERROR = "error"
 
 
 @dataclass
@@ -103,3 +105,19 @@ class ClassDefinition(BaseCodeElement):
     decorator_list: list[str] = field(default_factory=list)
     base_classes: dict[str, str] = field(default_factory=dict)
     unresolved_base_classes: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ErrorsList(JsonElement):
+    """Модель для хранения ошибок ast-парсера"""
+    name: str = "Ast parser errors"
+    element_type: CodeElementType = CodeElementType.ERRORS_LIST
+    errors: list['AstParsingError'] = field(default_factory=list)
+
+
+@dataclass
+class AstParsingError(JsonElement):
+    """Модель для описания ошибок ast-парсера"""
+    element_type: CodeElementType = CodeElementType.ERROR
+    error_text: str = ""
+    file_path: str = ""

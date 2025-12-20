@@ -5,7 +5,8 @@ from .data_models import (
     Folder,
     JsonElement,
     BaseCodeModule,
-    CodeElementType
+    CodeElementType,
+    SourceSpan, AstParsingError, ErrorsList
 )
 
 
@@ -38,7 +39,26 @@ class FolderReader:
 
         python_files = self._find_python_files(folder_path)
         for python_file in python_files:
-            children_id = self._analyze_file(python_file, folder_model.id)
+            try:
+                children_id = self._analyze_file(python_file, folder_model.id)
+            except Exception as e:
+                module_element = BaseCodeModule(
+                    name=python_file.name,
+                    source_span=SourceSpan(file_path=str(python_file), start_line=0, end_line=0)
+                )
+                self.all_models[module_element.id] = module_element
+
+                error_model = AstParsingError(
+                    name=type(e).__name__,
+                    error_text=str(e),
+                    file_path=str(python_file),
+                )
+
+                if not self.all_models.get('errors'):
+                    self.all_models['errors'] = ErrorsList()
+                self.all_models['errors'].errors.append(error_model)
+                continue
+
             if children_id:
                 children_ids.append(children_id)
 
@@ -83,10 +103,7 @@ class FolderReader:
                 return None
 
         processor = AstProcessor(str(self.project_root), str(file_path), self.config.get('process_nodes', {}))
-        try:
-            file_models = processor.process_file(source_code)
-        except Exception:
-            return None
+        file_models = processor.process_file(source_code)
 
         for model_id, model in file_models.items():
             if isinstance(model, BaseCodeModule):
